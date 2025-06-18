@@ -1,0 +1,125 @@
+services:
+  jellyfin:
+    user: 0:666
+    image: jellyfin/jellyfin
+    container_name: jellyfin
+    volumes:
+      - /etc/pknw1/config/jellyfin:/config
+      - /media/www/static.pknw1.co.uk/jellyfin-uploads:/config/static.pknw1.co.uk
+      - /etc/pknw1/config/jellyfin/jellyfin-web/main.jellyfin.bundle.js:/jellfin/jellyfin-web/main.jellyfin.bundle.js
+      - /etc/pknw1/config/jellyfin/branding/session-login-index-html.c73c6453a153f384f752.chunk.js:/jellyfin/jellyfin-web/session-login-index-html.c73c6453a153f384f752.chunk.js
+      - /dev/shm:/dev/shm
+      - /downloads:/downloads
+      - /media:/media
+      - /etc/pknw1/config/jellyfin/branding:/jellyfin/jellyfin-web/assets
+      - /etc/pknw1/config/jellyfin/branding/baba78f2a106d9baee83.png:/jellyfin/jellyfin-web/baba78f2a106d9baee83.png
+      - /etc/pknw1/config/jellyfin/config.json:/jellyfin/jellyfin-web/config.json
+    restart: 'unless-stopped'
+    # Optional - alternative address used for autodiscovery
+    ports:
+      - 172.22.20.1:8096:8096
+    networks:
+      - proxy
+    environment:
+      - JELLYFIN_PublishedServerUrl=https://notflix.pknw1.co.uk
+      - VIRTUAL_HOST=notflix.pknw1.co.uk,jf.pknw1.co.uk,watch.streaming-from.cloud,jellyfin.pknw1.co.uk
+      - VIRTUAL_PORT=8096
+    # Optional - may be necessary for docker healthcheck to pass if running in host network mode
+    dns:
+      - 8.8.8.8
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/web/"]
+      interval: 60s
+      timeout: 30s
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    user: 19200:666
+    container_name: jellyseerr
+    environment:
+      - VIRTUAL_HOST=requests.pknw1.co.uk,jellyseerr.pknw1.co.uk,jellyseerr.admin.pknw1.co.uk
+      - VIRTUAL_PORT=5055
+      - TZ=Europe/Paris
+      - PORT=5055 #optional
+    dns:
+      - 8.8.8.8
+    networks:
+      - proxy
+      - admin
+    volumes:
+      - /etc/pknw1/config/jellyseerr:/app/config
+      - /etc/pknw1/config/jellyseerr/branding/notflix_logo_white.svg:/app/public/logo_full.svg
+      - /etc/pknw1/config/jellyseerr/branding/notflix_logo_white.svg:/app/public/logo_stacked.svg
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-O-", "http://localhost:5055"]
+      interval: 60s
+      timeout: 30s
+
+
+  jellyseerr-admin:
+    image: hrfee/jfa-go
+    user: 19100:666
+    container_name: jellyseerr-admin
+    environment:
+      - VIRTUAL_HOST=accounts.pknw1.co.uk,my.pknw1.co.uk
+      - VIRTUAL_PORT=8056
+      - TZ=Europe/Paris
+    ports:
+      - 172.22.20.1:8056:8056
+    networks:
+      - proxy
+    volumes:
+      - /etc/pknw1/config/jellyseerr-admin:/data
+      - /etc/pknw1/config/jellyfin/:/jf
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    healthcheck:
+      #test: ["CMD", "/data/healthcheck"]
+      test: ["CMD", "curl", "-f", "http://localhost:8056"]
+      interval: 60s
+      timeout: 30s
+
+  jellyfin_vue:
+    container_name: jellyfin_vue
+    image: jellyfin/jellyfin-vue:unstable #.2025-06-06.cec6544 #ghcr.io/jellyfin/jellyfin-vue:unstable
+    restart: always
+    networks:
+      - proxy
+    environment:
+      - JELLYFIN_PublishedServerUrl=https://notflix.pknw1.co.uk
+      - DEFAULT_SERVERS=https://notflix.pknw1.co.uk
+      - DISABLE_SERVER_SELECTION=1
+      - VIRTUAL_HOST=vue.pknw1.co.uk
+      - VIRTUAL_PORT=80
+
+  notflix-addusers:
+    image: pknw1/notflix_adduser:latest
+    container_name: notflix-addusers
+    environment:
+      - VIRTUAL_HOST=adduser.pknw1.co.uk
+      - VIRTUAL_PORT=3000
+      - TZ=Europe/Paris
+    networks:
+      - proxy
+    volumes:
+      - /etc/pknw1/config/notflix_useradd:/config
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+      #healthcheck:
+      #  test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      #  interval: 60s
+      #  timeout: 30s
+
+
+
+
+
+networks:
+  proxy:
+    external: true
+  admin:
+    external: true
+
